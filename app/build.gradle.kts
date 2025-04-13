@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
+    kotlin("kapt")
 }
 
 android {
@@ -43,7 +44,8 @@ android {
 dependencies {
 
     ksp(libs.androidx.room.compiler)
-
+    implementation(libs.dagger)
+    kapt(libs.dagger.compiler)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

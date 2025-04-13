@@ -1,12 +1,17 @@
 package ru.yandex.architectureproject.domain
 
+import kotlinx.coroutines.delay
 import ru.yandex.architectureproject.data.repository.TaskRepository
+import javax.inject.Inject
 
-class CompleteTaskUseCase(
+class CompleteTaskUseCase @Inject constructor(
     private val repository: TaskRepository,
 ) {
     suspend operator fun invoke(taskId: Int) {
         repository.completeTask(taskId)
-        // TODO: Здесь будет автоудаление задачи
+
+        // Запускаем автоудаление через 10 секунд
+        delay(10_000) // 10 секунд в миллисекундах
+        repository.deleteTask(taskId)
     }
 }
