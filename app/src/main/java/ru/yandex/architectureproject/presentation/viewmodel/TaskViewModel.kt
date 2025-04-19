@@ -63,14 +63,12 @@ class TaskViewModel(
 
     private suspend fun handleUpdateStatus(action: TaskAction.UpdateTaskStatus) {
         if (action.isDone) {
-            // Отменяем предыдущий Job, если был
+
             deletionJobs[action.taskId]?.cancel()
 
-            // Помечаем задачу выполненной
             completeTaskUseCase(action.taskId)
             loadTasks()
 
-            // Запускаем автоудаление
             deletionJobs[action.taskId] = viewModelScope.launch {
                 delay(autoDeleteDelayMs)
 
@@ -81,7 +79,7 @@ class TaskViewModel(
                 }
             }
         } else {
-            // Отменяем автоудаление и помечаем невыполненной
+
             deletionJobs[action.taskId]?.cancel()
             deletionJobs.remove(action.taskId)
             incompleteTaskUseCase(action.taskId)
