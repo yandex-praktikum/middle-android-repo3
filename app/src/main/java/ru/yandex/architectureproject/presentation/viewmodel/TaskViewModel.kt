@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,26 +29,30 @@ class TaskViewModel(
     private val completeTaskUseCase: CompleteTaskUseCase,
     private val incompleteTaskUseCase: IncompleteTaskUseCase,
     private val ioDispatcher: CoroutineDispatcher,
+    private val autoDeleteDelayMs: Long = 10_000L
 ) : ViewModel() {
+
     private val _state = MutableStateFlow<TaskState>(TaskState.Loading)
     val state: StateFlow<TaskState> = _state.asStateFlow()
 
     private val deletionJobs = mutableMapOf<Int, Job>()
 
     init {
-        viewModelScope.launch {
-            reduce(TaskAction.LoadTasks)
+        loadInitialTasks()
+    }
+
+    suspend fun reduce(action: TaskAction) {
+        when (action) {
+            is TaskAction.LoadTasks -> loadTasks()
+            is TaskAction.AddTask -> handleAddTask(action)
+            is TaskAction.UpdateTaskStatus -> handleUpdateStatus(action)
+            is TaskAction.DeleteTask -> handleDeleteTask(action)
         }
     }
 
-    fun reduce(action: TaskAction) {
+    private fun loadInitialTasks() {
         viewModelScope.launch {
-            when (action) {
-                is TaskAction.LoadTasks -> loadTasks()
-                is TaskAction.AddTask -> handleAddTask(action)
-                is TaskAction.UpdateTaskStatus -> handleUpdateStatus(action)
-                is TaskAction.DeleteTask -> handleDeleteTask(action)
-            }
+            loadTasks()
         }
     }
 
@@ -58,31 +63,27 @@ class TaskViewModel(
 
     private suspend fun handleUpdateStatus(action: TaskAction.UpdateTaskStatus) {
         if (action.isDone) {
-            // Cancel any existing deletion job for this task
+            // Отменяем предыдущий Job, если был
             deletionJobs[action.taskId]?.cancel()
 
-            // Create new deletion job
-            val deletionJob = viewModelScope.launch(ioDispatcher) {
-                completeTaskUseCase(action.taskId)
-                loadTasks()
+            // Помечаем задачу выполненной
+            completeTaskUseCase(action.taskId)
+            loadTasks()
 
-                // Schedule deletion after 10 seconds
-                kotlinx.coroutines.delay(10_000)
+            // Запускаем автоудаление
+            deletionJobs[action.taskId] = viewModelScope.launch {
+                delay(autoDeleteDelayMs)
 
-                // Check if job wasn't cancelled before proceeding with deletion
                 if (isActive) {
                     deleteTaskUseCase(action.taskId)
                     deletionJobs.remove(action.taskId)
                     loadTasks()
                 }
             }
-
-            deletionJobs[action.taskId] = deletionJob
         } else {
-            // Cancel pending deletion
+            // Отменяем автоудаление и помечаем невыполненной
             deletionJobs[action.taskId]?.cancel()
             deletionJobs.remove(action.taskId)
-
             incompleteTaskUseCase(action.taskId)
             loadTasks()
         }
@@ -91,7 +92,6 @@ class TaskViewModel(
     private suspend fun handleDeleteTask(action: TaskAction.DeleteTask) {
         deletionJobs[action.taskId]?.cancel()
         deletionJobs.remove(action.taskId)
-
         deleteTaskUseCase(action.taskId)
         loadTasks()
     }
@@ -108,7 +108,6 @@ class TaskViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        // Cancel all pending deletion jobs
         deletionJobs.values.forEach { it.cancel() }
         deletionJobs.clear()
     }
