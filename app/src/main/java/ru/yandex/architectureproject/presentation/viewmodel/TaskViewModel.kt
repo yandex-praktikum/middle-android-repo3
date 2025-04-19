@@ -41,12 +41,14 @@ class TaskViewModel(
         loadInitialTasks()
     }
 
-    suspend fun reduce(action: TaskAction) {
-        when (action) {
-            is TaskAction.LoadTasks -> loadTasks()
-            is TaskAction.AddTask -> handleAddTask(action)
-            is TaskAction.UpdateTaskStatus -> handleUpdateStatus(action)
-            is TaskAction.DeleteTask -> handleDeleteTask(action)
+    fun reduce(action: TaskAction) {
+        viewModelScope.launch {
+            when (action) {
+                is TaskAction.LoadTasks -> loadTasks()
+                is TaskAction.AddTask -> handleAddTask(action)
+                is TaskAction.UpdateTaskStatus -> handleUpdateStatus(action)
+                is TaskAction.DeleteTask -> handleDeleteTask(action)
+            }
         }
     }
 
@@ -63,7 +65,6 @@ class TaskViewModel(
 
     private suspend fun handleUpdateStatus(action: TaskAction.UpdateTaskStatus) {
         if (action.isDone) {
-
             deletionJobs[action.taskId]?.cancel()
 
             completeTaskUseCase(action.taskId)
@@ -79,7 +80,6 @@ class TaskViewModel(
                 }
             }
         } else {
-
             deletionJobs[action.taskId]?.cancel()
             deletionJobs.remove(action.taskId)
             incompleteTaskUseCase(action.taskId)
