@@ -42,6 +42,7 @@ android {
 
 dependencies {
 
+    implementation(libs.androidx.room.common.jvm)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.core.ktx)
